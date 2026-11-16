@@ -18,12 +18,13 @@
 
 - `src/blackhole-pcm.swift`：接收程序 Swift 源码。
 - `src/macmic-native-sender.swift`：低 CPU 的原生采集程序 Swift 源码。
-- `bin/blackhole-pcm-arm64`：已验证使用的 Apple Silicon 二进制，构建目标为 macOS 27.2。其他系统版本或架构请从源码重新编译；该二进制使用临时签名，未经过 Apple 公证。
+- `bin/blackhole-pcm-arm64`：保留作为参考的旧版 Apple Silicon 二进制，构建目标为 macOS 27.2；它不含内存释放修复。该二进制使用临时签名，未经过 Apple 公证。
 - `bin/blackhole-pcm-v2-arm64`：支持指定 44100 或 48000 Hz 的接收器，构建目标为 macOS 27.2。
 - `bin/macmic-native-sender-x86_64`：Intel 发送器，构建目标为 macOS 13.0；其他架构可从源码编译。
 - `send-microphone-native.fish`：使用默认麦克风的低 CPU 脚本。
 - `send-microphone.fish`：发送端脚本，目标地址和麦克风编号通过参数提供。
 - `skills/mac-mic-bridge/SKILL.md`：供 Agent 部署和排查本方案的可选 Skill。
+- `tools/`：用于[音频时间戳与时钟差测量](tools/README.md)的诊断工具。
 
 ## 前提
 
@@ -75,7 +76,7 @@ fish send-microphone-native.fish '<ssh-user>@<mac-mini-host>'
 
 ## 发送端：FFmpeg 备用模式
 
-备用方案使用原有接收器路径；在接收端安装兼容的 `bin/blackhole-pcm-arm64` 为 `~/.local/bin/blackhole-pcm`，或将 v2 构建安装到该路径（不带采样率参数时默认 48000 Hz）。
+备用方案使用原有接收器路径；在接收端将 v2 构建安装为 `~/.local/bin/blackhole-pcm`（不带采样率参数时默认 48000 Hz）。旧版接收器不含内存释放修复，应避免使用。
 
 在发送端克隆仓库并进入本目录，在本机图形会话的 **Terminal** 中列出 AVFoundation 音频设备：
 

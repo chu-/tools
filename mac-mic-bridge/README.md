@@ -18,12 +18,13 @@ The native sender captures the default input as 44.1 kHz, stereo, 16-bit little-
 
 - `src/blackhole-pcm.swift`: Swift source for the receiver.
 - `src/macmic-native-sender.swift`: Swift source for the low-CPU native sender.
-- `bin/blackhole-pcm-arm64`: the original Apple Silicon receiver binary, built for macOS 27.2. It is ad hoc signed and not notarized by Apple.
+- `bin/blackhole-pcm-arm64`: the original Apple Silicon receiver binary, built for macOS 27.2; retained for reference, but it lacks the memory-release fix. It is ad hoc signed and not notarized by Apple.
 - `bin/blackhole-pcm-v2-arm64`: receiver with selectable 44100 or 48000 Hz sample rate, built for macOS 27.2.
 - `bin/macmic-native-sender-x86_64`: Intel sender binary built for macOS 13.0 or later.
 - `send-microphone-native.fish`: low-CPU sender script using the default microphone.
 - `send-microphone.fish`: FFmpeg sender script with configurable host and microphone index.
 - `skills/mac-mic-bridge/SKILL.md`: optional agent skill for deploying and troubleshooting the bridge.
+- `tools/`: [audio timestamp and clock-offset diagnostics](tools/README.md).
 
 The prebuilt binaries are architecture-specific. Build from source on the target Mac if its architecture or OS version is not supported.
 
@@ -77,7 +78,7 @@ If prompted, allow Terminal to access the microphone. Keep the window open and p
 
 ## Sender: FFmpeg fallback
 
-The fallback expects `~/.local/bin/blackhole-pcm` on the receiver. Install the compatible `bin/blackhole-pcm-arm64` there, or install the v2 build at that path; without a sample-rate argument, v2 defaults to 48000 Hz.
+The fallback expects `~/.local/bin/blackhole-pcm` on the receiver. Install the v2 build at that path; without a sample-rate argument, v2 defaults to 48000 Hz. Avoid the legacy receiver binary because it lacks the memory-release fix.
 
 On the sending Mac, clone the repository and change into this directory. List AVFoundation devices from **Terminal** in the local graphical session:
 

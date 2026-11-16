@@ -31,11 +31,12 @@ do { try engine.start() } catch { fputs("Audio engine failed: \(error)\n", stder
 player.play()
 let inflight = DispatchSemaphore(value: 4)
 while true {
+ let more = autoreleasepool { () -> Bool in
  let data = FileHandle.standardInput.readData(ofLength: 8192)
- if data.isEmpty { break }
+ if data.isEmpty { return false }
  let frames = data.count / 4
- if frames == 0 { continue }
- guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)), let channels = buffer.floatChannelData else { break }
+ if frames == 0 { return true }
+ guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)), let channels = buffer.floatChannelData else { return false }
  buffer.frameLength = AVAudioFrameCount(frames)
  data.withUnsafeBytes { raw in
   let bytes = raw.bindMemory(to: UInt8.self)
@@ -49,6 +50,9 @@ while true {
  }
  inflight.wait()
  player.scheduleBuffer(buffer) { inflight.signal() }
+ return true
+ }
+ if !more { break }
 }
 for _ in 0..<4 { _ = inflight.wait(timeout: .now() + 2) }
 engine.stop()

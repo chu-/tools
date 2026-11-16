@@ -1,0 +1,43 @@
+# Live audio timestamp test
+
+`audio-marker.swift` prints the time of loud transient peaks from the current system default input. `clock-offset.py` estimates the difference between the two Macs' wall clocks. Neither tool saves audio. These are diagnostic tools, not part of the bridge's audio path.
+
+## Setup
+
+Compile the marker on each Mac:
+
+```fish
+swiftc -O audio-marker.swift -o audio-marker
+```
+
+Choose the MacBook microphone in **System Settings > Sound > Input** on the source Mac, and **BlackHole 2ch** on the receiving Mac. Keep the microphone bridge running. Run the marker in a local graphical Terminal session on each Mac; allow Terminal microphone access if prompted. A capture process launched through SSH may get silence because of macOS privacy permissions.
+
+On the MacBook:
+
+```fish
+./audio-marker source 0.15
+```
+
+On the Mac mini:
+
+```fish
+./audio-marker receiver 0.15
+```
+
+The second argument is the threshold between 0 and 1. Adjust it if a clap is missed or background sounds trigger false events; the levels may differ between devices. Start both markers, make several distinct claps near the MacBook microphone, and stop with **Control-C**. Each line reports an epoch time in seconds and a peak level; no audio is stored.
+
+From the Mac mini, check clock offset just before or after the measurement, replacing the placeholder:
+
+```fish
+python3 clock-offset.py '<ssh-user>@<macbook-host>'
+```
+
+The output is `MacBook clock minus Mac mini clock` with a round-trip-based uncertainty bound. For each matching clap:
+
+```text
+bridge delay = receiver timestamp - source timestamp + clock offset
+```
+
+Convert the offset from milliseconds to seconds before adding it. For example, offset +50 ms, source timestamp 100.100 s, receiver timestamp 100.300 s gives 0.250 s. Match the same clap, repeat several times, and report the results with the clock uncertainty. Asymmetric SSH transport, changing clock offsets, different thresholds and processing can add error. `timestamp=estimated` means the audio callback did not provide a host timestamp and the result is less precise. The input marker includes the measurement devices' capture and buffering delays; it is an estimate rather than a laboratory-grade latency measurement.
+
+This compares the source microphone against the BlackHole input. It does not timestamp Voice Memos' waveform drawing. Compare that display separately with a high-frame-rate video that shows the physical clap and both displays, accounting for camera frame duration.

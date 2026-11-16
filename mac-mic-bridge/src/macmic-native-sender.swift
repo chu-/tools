@@ -3,7 +3,7 @@ import AudioToolbox
 import CoreFoundation
 import Darwin
 
-let bufferSize: UInt32 = 16384
+let bufferSize: UInt32 = 4096
 let callback: AudioQueueInputCallback = { _, queue, buffer, _, _, _ in
     let count = Int(buffer.pointee.mAudioDataByteSize)
     let bytes = buffer.pointee.mAudioData.assumingMemoryBound(to: UInt8.self)
