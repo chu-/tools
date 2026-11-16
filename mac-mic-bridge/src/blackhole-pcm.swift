@@ -22,7 +22,9 @@ guard let audioUnit = output.audioUnit else { fputs("No output audio unit\n", st
 let err = AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &target, UInt32(MemoryLayout<AudioDeviceID>.size))
 guard err == noErr else { fputs("Unable to select BlackHole: \(err)\n", stderr); exit(1) }
 let player = AVAudioPlayerNode()
-let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: 2, interleaved: false)!
+let rate = CommandLine.arguments.count > 1 ? Double(CommandLine.arguments[1]) : 48000
+guard let rate, rate == 44100 || rate == 48000 else { fputs("Usage: blackhole-pcm [44100|48000]\n", stderr); exit(2) }
+let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 2, interleaved: false)!
 engine.attach(player)
 engine.connect(player, to: engine.mainMixerNode, format: format)
 do { try engine.start() } catch { fputs("Audio engine failed: \(error)\n", stderr); exit(1) }
