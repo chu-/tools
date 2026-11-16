@@ -2,6 +2,8 @@
 
 将一台 Mac 的麦克风实时发送到另一台 Mac，并通过接收端的 BlackHole 2ch 提供给会议或录音应用。两台 Mac 可以通过 Wi-Fi 上的 Tailscale 连接。
 
+**Agent 指引：** 如果用户要求部署、运行或排查 Mac Mic Bridge，请先阅读并遵循 [Mac Mic Bridge Skill](skills/mac-mic-bridge/SKILL.md)，再根据本 README 和当前设备状态执行。设备地址、用户和音频设备编号需要现场确认。
+
 ```text
 发送端麦克风 → FFmpeg/AVFoundation → SSH → 接收端 blackhole-pcm
                                               ↓
@@ -15,6 +17,7 @@
 - `src/blackhole-pcm.swift`：接收程序 Swift 源码。
 - `bin/blackhole-pcm-arm64`：已验证使用的 Apple Silicon 二进制，构建目标为 macOS 27.2。其他系统版本或架构请从源码重新编译；该二进制使用临时签名，未经过 Apple 公证。
 - `send-microphone.fish`：发送端脚本，目标地址和麦克风编号通过参数提供。
+- `skills/mac-mic-bridge/SKILL.md`：供 Agent 部署和排查本方案的可选 Skill。
 
 ## 前提
 
