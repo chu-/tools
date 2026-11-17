@@ -51,3 +51,18 @@ Convert the offset from milliseconds to seconds before adding it. For example, o
 This compares the source microphone against the BlackHole input. It does not timestamp Voice Memos' waveform drawing. Compare that display separately with a high-frame-rate video that shows the physical clap and both displays, accounting for camera frame duration.
 
 On November 17, 2026, continuity checks invalidated the initial low-latency result as a quality claim: the 20 ms implementation dropped frames and produced underruns, and it held a mutex during PCM decoding. Decoding now runs outside the mutex; playback uses a 40 ms reserve and an 80 ms cap. The current buffer settings have not been verified below 100 ms end to end. Arrival-gap instrumentation and an independent paced TCP test also found roughly 120–400 ms stalls on both the overlay and direct LAN paths. A 15-second direct-LAN test with no microphone or audio program had 20 receive gaps over 80 ms and a maximum near 399 ms. The source of those transport stalls remains unresolved. Keep continuity/drop counters alongside latency measurements; short-transient latency alone does not verify audio quality.
+
+## Receiver batch conversion
+
+The receiver reuses an aligned 4096-byte input buffer and an 8192-byte Float buffer. Accelerate converts complete stereo frames in batches; zero to three trailing bytes carry over to the next read. Small reads are processed immediately once a complete frame is available. The format, 40 ms prefill and 80 ms queue cap are unchanged.
+
+On November 17, 2026, two 30-second live measurements using process CPU-time deltas showed the receiver alone dropping from approximately 1.40% to 0.90% of one logical core (about 36% lower in this comparison). SSH, Core Audio and Tailscale CPU are excluded. This is a short before/after sample, not a guaranteed reduction or a new latency measurement.
+
+An isolated synthetic ingest-and-render benchmark used 20000 iterations per run and the median of three runs for each block size:
+
+| Input block | Previous CPU seconds | Batch conversion CPU seconds |
+| --- | ---: | ---: |
+| 512 bytes | 0.104062 | 0.004663 |
+| 4096 bytes | 0.810006 | 0.024114 |
+
+These numbers describe the synthetic data-processing loop, not whole-process speedup. The expanded `--self-test` compares all 65536 Int16 values on both channels with scalar conversion, including fragmented, unaligned and oversized reads. It also passes with AddressSanitizer enabled. All benchmark/test audio is synthetic and never reaches an audio device.
