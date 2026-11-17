@@ -40,7 +40,10 @@ let callback: AudioQueueInputCallback = { _, queue, buffer, timestamp, _, _ in
         if eventTime - lastEvent >= 0.7 {
             lastEvent = eventTime
             let quality = hasHostTime ? "host" : "estimated"
-            print(String(format: "%@ %.6f peak=%.3f timestamp=%@", label, eventTime, Double(maxValue) / 32768.0, quality))
+            let monotonic = hasHostTime
+                ? Double(AudioConvertHostTimeToNanos(timestamp.pointee.mHostTime)) / 1e9 + Double(peakIndex) / sampleRate
+                : Double(nowHost) / 1e9 - Double(samples - peakIndex) / sampleRate
+            print(String(format: "%@ %.6f peak=%.3f timestamp=%@ host=%.6f", label, eventTime, Double(maxValue) / 32768.0, quality, monotonic))
             fflush(stdout)
         }
     }

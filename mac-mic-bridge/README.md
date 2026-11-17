@@ -94,6 +94,35 @@ fish send-microphone.fish '<ssh-user>@<mac-mini-host>' '<audio-device-index>'
 
 If prompted, allow Terminal to access the microphone. Keep the window open and press **Control-C** to stop. The script does not save audio files. Recheck the device index if audio devices change.
 
+## Latency reduction
+
+The main change is to reduce block-filling waits and keep queued audio bounded. The previous native path captured 4096 bytes at a time (23.2 ms), read 8192 bytes per receiver block (46.4 ms), and allowed four scheduled player buffers plus a pending block before applying backpressure. Those five receiver blocks represent approximately 232 ms of audio, before pipe, SSH and device buffering. This explains an accumulation mechanism, rather than proving the full cause of a particular one-second delay. Durations here use 44.1 kHz stereo, 16-bit PCM: 176400 bytes per second.
+
+| Stage | Current implementation | Purpose |
+| --- | --- | --- |
+| Capture | 128 frames / 512 bytes per buffer, approximately 2.90 ms | Reduce the time needed to fill each capture buffer. Hardware and AudioQueue may still deliver callbacks in batches. |
+| Pipe to SSH | Nonblocking writes no larger than Darwin's `PIPE_BUF`; drop a whole block on `EAGAIN` | Keep SSH backpressure from blocking the capture callback; preserve PCM frame alignment. |
+| Receiver input | POSIX `read` processes available bytes immediately and preserves incomplete stereo frames across reads | Remove the wait to fill an 8192-byte input block. The current 4096-byte read capacity is a maximum, not a fill requirement. |
+| Playback | `AVAudioSourceNode` pulls from a ring buffer capped at 80 ms; overflow discards the oldest frames | Follow live audio without an expanding scheduled-player queue. |
+| Jitter handling | Prefill 40 ms at startup and after underrun; output silence when audio is unavailable | Provide a reserve for uneven arrival while keeping the queue bounded. The cap is not a fixed 80 ms wait. |
+| Callback synchronization | Decode PCM outside the mutex; hold it only for short copies and queue updates; render uses `trylock` | Avoid skipping entire playback blocks while the input thread decodes data. |
+
+The sender also uses 16 empty capture buffers, a dedicated dispatch queue with user-interactive QoS, and a latency-critical activity retained while capture runs. The empty buffers accommodate hardware bursts without adding a fixed playback queue. A per-user capture lock prevents duplicate native senders after helper restarts; overlapping streams can sound doubled or metallic. The native SSH script disables compression and X11 forwarding and requests `IPQoS=ef`; that QoS request depends on network support and does not guarantee latency.
+
+### Preserve continuity while reducing delay
+
+The initial 20 ms receiver cap reduced transient delay but caused audible dropouts and a robotic sound. Decoding under the shared mutex made this worse because render callbacks returned silence on contention. The final settings use a **40 ms prefill reserve and an 80 ms queue cap**, with decoding outside the mutex. Simply shrinking buffers further can sacrifice sound continuity. PCM has no lossy codec here, but discarded frames and inserted silence still lose parts of the sound.
+
+These changes bound application playback buffering; SSH/TCP can still retain old audio during a transport stall. Independent paced TCP testing reproduced receive gaps near 399 ms, including on the direct LAN path. The source of those stalls remains unresolved. A 40 ms reserve cannot hide a several-hundred-millisecond interruption, and the 80 ms cap is not an end-to-end latency guarantee.
+
+### Deploy and verify
+
+Rebuild or install the updated binaries on **both** Macs using the setup instructions above, then restart the bridge. Editing source files does not update a running process. Check installed binary hashes against the intended builds and confirm that only one sender and receiver are active.
+
+Run `blackhole-pcm-v2 --self-test` without opening an audio device to check overflow, fragmented reads, stereo conversion, wraparound, underrun and prefill behavior. For a live check, use the [timestamp tools](tools/README.md) with monotonic clock probes before and after matching transients. Also inspect continuity: the receiver reports dropped frames, underruns, contention, missing frames after startup, and read-gap statistics on exit. The sender's optional `--diagnostics` flag reports capture age, callback gaps, peaks, dropped blocks and transient timestamps to stderr without saving audio; disable it after testing.
+
+On November 17, 2026, the user reported no noticeable delay with the current running version. Its exact end-to-end latency has not been remeasured. The earlier approximately 54 ms median belongs to the superseded 20 ms configuration and is not validation of the current settings or of uninterrupted audio. Accept a sub-100 ms result only after checking both corrected timestamps and audio continuity; downstream meeting apps may add buffering.
+
 ## Verify and troubleshoot
 
 On the receiving Mac, select **BlackHole 2ch** under **System Settings > Sound > Input**. Speak into the sending Mac's microphone and confirm that **Input level** moves continuously. Then select **BlackHole 2ch** in the target meeting or recording app and make a short test recording.
